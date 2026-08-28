@@ -47,7 +47,7 @@ FRONT_OVERHANG_M = 0.845
 REAR_OVERHANG_M = LENGTH_M - FRONT_OVERHANG_M - WHEELBASE_M  # ~1.004 m
 
 WHEEL_RADIUS_M = 0.350
-"""Rolling radius for a 20\" Performance wheel + low-profile tire. ESTIMATE, m."""
+"""Rolling radius for a 20" Performance wheel + low-profile tire. ESTIMATE, m."""
 
 STOCK_RIDE_HEIGHT_MM = 128.0
 """Stock underbody static ride height used as the delta origin, mm."""
