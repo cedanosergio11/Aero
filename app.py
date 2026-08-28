@@ -25,7 +25,7 @@ from aero_config import (
     WHEELBASE_M,
 )
 from flow import sample_grid, solve_panels, trace_streamlines
-from forces import compute_forces
+from forces import compute_forces, compute_forces_at_mph
 from geometry import build_outline, wheel_discs
 
 MPH_TO_MPS = 0.44704
@@ -39,7 +39,7 @@ app = FastAPI(
         "Performance silhouette. NOT full 3D CFD. Forces come from the "
         "street-aero polar in aero_config.py; the panel field is pictorial."
     ),
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -64,37 +64,68 @@ class SimulateRequest(BaseModel):
         le=180,
         description="Optional alternate speed in mph (0–180). Ignored if airspeedMps is set.",
     )
-    rideHeightMm: float = Field(
-        ...,
+    rideHeightMm: Optional[float] = Field(
+        default=None,
         ge=80,
         le=160,
-        description="Underbody ride height, mm of length. Stock 128.",
+        description=(
+            "Level underbody ride height, mm. Stock 128. Fallback when "
+            "rideHeightFrontMm / rideHeightRearMm are omitted: h_f = h_r."
+        ),
+    )
+    rideHeightFrontMm: Optional[float] = Field(
+        default=None,
+        ge=80,
+        le=160,
+        description="Front-axle ride height, mm (80–160). Stock 128. Wins over rideHeightMm.",
+    )
+    rideHeightRearMm: Optional[float] = Field(
+        default=None,
+        ge=80,
+        le=160,
+        description="Rear-axle ride height, mm (80–160). Stock 128. Wins over rideHeightMm.",
     )
     splitter: float = Field(
         ...,
         ge=0,
         le=120,
-        description="Front splitter extension, mm of length.",
+        description="EXTRA front splitter extension, mm of length (on top of stock).",
     )
     rearWing: float = Field(
         ...,
         ge=0,
         le=280,
-        description="Rear wing chord, mm of length. 0 = no wing.",
+        description="EXTRA rear wing chord, mm of length. 0 = stock/no extra wing.",
     )
     diffuser: float = Field(
         ...,
         ge=0,
         le=200,
-        description="Diffuser length e, mm of length. 0 = stock/flat underbody.",
+        description="EXTRA diffuser length e, mm of length. 0 = stock/flat underbody.",
     )
 
     @model_validator(mode="after")
-    def _resolve_speed(self) -> "SimulateRequest":
+    def _resolve_speed_and_ride(self) -> "SimulateRequest":
         if self.airspeedMps is None and self.airspeedMph is None:
             raise ValueError("Provide airspeedMps or airspeedMph")
         if self.airspeedMps is None:
             object.__setattr__(self, "airspeedMps", float(self.airspeedMph) * MPH_TO_MPS)
+
+        mm = self.rideHeightMm
+        hf = self.rideHeightFrontMm
+        hr = self.rideHeightRearMm
+        if mm is None and hf is None and hr is None:
+            raise ValueError(
+                "Provide rideHeightMm or rideHeightFrontMm/rideHeightRearMm"
+            )
+        # Front/rear, if sent, win over rideHeightMm. Missing axle falls
+        # back to rideHeightMm, else to the other axle (level).
+        if hf is None:
+            hf = mm if mm is not None else hr
+        if hr is None:
+            hr = mm if mm is not None else hf
+        object.__setattr__(self, "rideHeightFrontMm", float(hf))
+        object.__setattr__(self, "rideHeightRearMm", float(hr))
         return self
 
 
@@ -153,8 +184,9 @@ class MetaOut(BaseModel):
         "balancePct = 100*frontN/(frontN+rearN) when |frontN+rearN|>0, else 50."
     )
     coefficients: str = (
-        "Stock Cd/Cl and part effects are ChainBear's street-aero model in "
-        "aero_config.py, not Tesla-measured data."
+        "Stock Cd/Cl (0.219 / -0.05, 42% front) already include factory "
+        "splitter/spoiler/diffuser. Sliders are EXTRA mm. Polar uses "
+        "independent h_f / h_r (rake) in aero_config.py; not Tesla-measured."
     )
     flowMethod: str = (
         "2D constant-strength source panel method with a ground-plane image. "
@@ -170,6 +202,7 @@ class MetaOut(BaseModel):
 
 class SimulateResponse(BaseModel):
     forces: ForcesOut
+    forcesAtMph: dict[str, ForcesOut]
     flow: FlowOut
     meta: MetaOut = Field(default_factory=MetaOut)
 
@@ -186,13 +219,25 @@ def health() -> HealthOut:
 @app.post("/simulate", response_model=SimulateResponse)
 def simulate(req: SimulateRequest) -> SimulateResponse:
     v = float(req.airspeedMps)
-    outline = build_outline(req.rideHeightMm, req.splitter, req.rearWing, req.diffuser)
+    h_f_mm = float(req.rideHeightFrontMm)
+    h_r_mm = float(req.rideHeightRearMm)
+    h_avg_mm = 0.5 * (h_f_mm + h_r_mm)
+    outline = build_outline(
+        h_f_mm, req.splitter, req.rearWing, req.diffuser, ride_height_rear_mm=h_r_mm
+    )
     sol = solve_panels(outline, v)
     grid = sample_grid(outline, sol)
-    forces = compute_forces(
-        v, req.rideHeightMm, req.splitter, req.rearWing, req.diffuser
+    kw = dict(
+        ride_height_front_mm=h_f_mm,
+        ride_height_rear_mm=h_r_mm,
     )
-    slines = trace_streamlines(outline, sol, grid, req.rideHeightMm)
+    forces = compute_forces(
+        v, h_f_mm, req.splitter, req.rearWing, req.diffuser, **kw
+    )
+    at_mph = compute_forces_at_mph(
+        h_f_mm, req.splitter, req.rearWing, req.diffuser, **kw
+    )
+    slines = trace_streamlines(outline, sol, grid, h_avg_mm)
     wheels = [WheelOut(**w) for w in wheel_discs()]
     flow = FlowOut(
         outline=[[float(p[0]), float(p[1])] for p in outline],
@@ -206,6 +251,7 @@ def simulate(req: SimulateRequest) -> SimulateResponse:
     )
     return SimulateResponse(
         forces=ForcesOut(**forces),
+        forcesAtMph={k: ForcesOut(**fv) for k, fv in at_mph.items()},
         flow=flow,
         meta=MetaOut(wheels=wheels),
     )
