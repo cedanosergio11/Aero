@@ -123,3 +123,56 @@ def test_streamlines_exist_and_change_with_parts():
     assert lines(128, 0, 0, 120) != s0
     assert lines(160, 0, 0, 0) != s0
     assert lines(128, 0, 0, 0, v=50.0) != s0
+
+
+def test_rake_polar_direct():
+    """Front 100 / rear 140 changes Cd, Cl, and front-biased balance."""
+    stock = compute_forces(30.0, 128.0, 0.0, 0.0, 0.0)
+    rake = compute_forces(
+        30.0,
+        128.0,
+        0.0,
+        0.0,
+        0.0,
+        ride_height_front_mm=100.0,
+        ride_height_rear_mm=140.0,
+    )
+    h_f, h_r = 0.100, 0.140
+    h_avg = 0.5 * (h_f + h_r)
+    rk = h_r - h_f
+    cd_exp = 0.219 + 0.15 * (h_avg - 0.128) - 0.10 * rk + 0.8 * rk * rk
+    cl_exp = -0.05 + 1.2 * (h_avg - 0.128) - 2.5 * rk
+    assert abs(rake["cd"] - cd_exp) < 1e-12
+    assert abs(rake["cl"] - cl_exp) < 1e-12
+    assert abs(stock["cd"] - STOCK_CD) < 1e-12
+    assert abs(stock["cl"] - STOCK_CL_AERO) < 1e-12
+    assert rake["cd"] != stock["cd"]
+    assert rake["cl"] != stock["cl"]
+    assert rake["balancePct"] > stock["balancePct"]
+    assert abs((rake["frontN"] + rake["rearN"]) - rake["downforceN"]) < 1e-6
+
+
+def test_rake_pitches_underbody_at_axles():
+    o = build_outline(100, 0, 0, 0, ride_height_rear_mm=140)
+    ub = o[o[:, 1] < 0.28]
+    order = np.argsort(ub[:, 0])
+    ub = ub[order]
+    y_fa = float(np.interp(0.845, ub[:, 0], ub[:, 1]))
+    y_ra = float(np.interp(3.72, ub[:, 0], ub[:, 1]))
+    assert abs(y_fa - 0.100) < 0.008
+    assert abs(y_ra - 0.140) < 0.008
+
+
+def test_level_ride_matches_old_single_height():
+    a = compute_forces(30.0, 100.0, 40.0, 80.0, 50.0)
+    b = compute_forces(
+        30.0,
+        999.0,
+        40.0,
+        80.0,
+        50.0,
+        ride_height_front_mm=100.0,
+        ride_height_rear_mm=100.0,
+    )
+    for k in a:
+        assert abs(a[k] - b[k]) < 1e-12
