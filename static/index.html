@@ -117,17 +117,21 @@
     const $ = (id) => document.getElementById(id);
     const canvas = $("c");
     const ctx = canvas.getContext("2d");
-    const STOCK = 0.128, LEN = 4.724, WHEEL_R = 0.325, WELL_R = 0.372;
+    const STOCK = 0.128, LEN = 4.724, H = 1.431, WB = 2.875;
     const AXLES = [0.85, 3.72];
+    // Photo UV: car fills the PNG, nose left. Ground at wheels, roof at peak.
+    const CAR_U0 = 0.018, CAR_U1 = 0.978, CAR_VG = 0.905, CAR_VR = 0.372;
     const UPPER0 = [
-      [0.00, 0.17], [0.00, 0.40], [0.015, 0.54], [0.07, 0.62], [0.16, 0.645],
-      [0.38, 0.655], [0.62, 0.662], [0.88, 0.675], [1.10, 0.705],
-      [1.26, 0.86], [1.40, 1.05], [1.55, 1.22], [1.72, 1.34], [1.92, 1.405],
-      [2.15, 1.426], [2.45, 1.432], [2.78, 1.428], [3.08, 1.408],
-      [3.32, 1.34], [3.55, 1.20], [3.78, 1.06], [4.00, 0.98], [4.20, 0.942],
-      [4.38, 0.935], [4.48, 0.955], [4.54, 1.015], [4.62, 0.965],
-      [4.69, 0.78], [4.72, 0.50], [4.724, 0.34], [4.70, 0.21], [4.50, 0.16],
+      [-0.55, 0.42], [0.00, 0.40], [0.04, 0.54], [0.12, 0.62], [0.32, 0.645],
+      [0.70, 0.655], [1.05, 0.68], [1.22, 0.82], [1.38, 1.04], [1.55, 1.22],
+      [1.72, 1.34], [1.92, 1.405], [2.15, 1.426], [2.45, 1.432], [2.78, 1.428],
+      [3.08, 1.408], [3.32, 1.34], [3.55, 1.20], [3.78, 1.06], [4.00, 0.98],
+      [4.22, 0.942], [4.40, 0.938], [4.55, 0.96], [4.68, 0.78], [4.724, 0.50],
     ];
+
+    const carImg = new Image();
+    carImg.src = "/static/m3p-side.png";
+    carImg.onerror = () => { carImg.src = "m3p-side.png"; };
 
     function resize() {
       const r = canvas.getBoundingClientRect();
@@ -168,28 +172,10 @@
     }
     function py(x, y, hf, hr) { return [x, y - STOCK + pitchY(x, hf, hr)]; }
     function upperBody(hf, hr) { return UPPER0.map(([x, y]) => py(x, y, hf, hr)); }
-    function closedBody(s) {
-      const upper = upperBody(s.hf, s.hr);
-      const pts = upper.slice();
-      if (s.wingM > 0.004) {
-        const duck = upper[25];
-        const xLe = duck[0] - 0.04, y0 = duck[1] + 0.035;
-        pts.push([xLe, y0], [xLe + 0.04, y0 + 0.022], [xLe + s.wingM, y0 + 0.03],
-                 [xLe + s.wingM, y0 + 0.008], [xLe, y0]);
-      }
-      const rise = Math.min(s.diffuserM * 0.85, 0.2);
-      pts.push([LEN, s.hr + rise]);
-      for (let x = 4.3; x >= 0.15; x -= 0.35) pts.push([x, pitchY(x, s.hf, s.hr)]);
-      if (s.splitterM > 0.001) {
-        pts.push([-s.splitterM, s.hf - 0.008], [-s.splitterM, s.hf - 0.02]);
-      }
-      pts.push([0, s.hf], [0, upper[0][1]]);
-      return pts;
-    }
 
     function worldToScreen(s) {
-      const x0 = -0.85 - s.splitterM, x1 = 5.55, y0 = -0.12, y1 = 1.82;
-      const pad = 40 * devicePixelRatio;
+      const x0 = -1.05 - s.splitterM, x1 = 6.05, y0 = -0.18, y1 = 1.92;
+      const pad = 36 * devicePixelRatio;
       const w = canvas.width - 2 * pad, h = canvas.height - 2 * pad;
       const sc = Math.min(w / (x1 - x0), h / (y1 - y0));
       const ox = pad + (w - sc * (x1 - x0)) / 2;
@@ -202,7 +188,7 @@
       if (p.length < 2) return;
       ctx.beginPath();
       ctx.moveTo(p[0][0], p[0][1]);
-      if (p.length === 2) { ctx.lineTo(p[1][0], p[1][1]); }
+      if (p.length === 2) ctx.lineTo(p[1][0], p[1][1]);
       else {
         for (let i = 0; i < p.length - 1; i++) {
           const p0 = p[Math.max(0, i - 1)], p1 = p[i], p2 = p[i + 1], p3 = p[Math.min(p.length - 1, i + 2)];
@@ -226,26 +212,24 @@
       return out;
     }
 
-    function screenPoly(poly, toS) { return poly.map(([x, y]) => toS(x, y)); }
-
     function drawTunnel(toS, dpr) {
       const w = canvas.width, h = canvas.height;
-      const g = ctx.createRadialGradient(w * 0.55, h * 0.42, 40, w * 0.5, h * 0.45, w * 0.75);
-      g.addColorStop(0, "#141a24");
-      g.addColorStop(0.45, "#080c12");
-      g.addColorStop(1, "#020305");
+      const g = ctx.createRadialGradient(w * 0.48, h * 0.42, 20 * dpr, w * 0.5, h * 0.48, w * 0.78);
+      g.addColorStop(0, "#101820");
+      g.addColorStop(0.4, "#070b10");
+      g.addColorStop(1, "#010204");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
-      const f0 = toS(-1.2, 0), f1 = toS(6.2, 0);
-      const fg = ctx.createLinearGradient(0, f0[1] - 8, 0, h);
-      fg.addColorStop(0, "rgba(70, 120, 150, 0.18)");
-      fg.addColorStop(0.08, "rgba(12, 18, 26, 0.95)");
-      fg.addColorStop(1, "#05080c");
+      const f0 = toS(-1.4, 0), f1 = toS(6.4, 0);
+      const fg = ctx.createLinearGradient(0, f0[1] - 10 * dpr, 0, h);
+      fg.addColorStop(0, "rgba(50, 90, 120, 0.16)");
+      fg.addColorStop(0.07, "rgba(8, 12, 18, 0.96)");
+      fg.addColorStop(1, "#030508");
       ctx.fillStyle = fg;
       ctx.fillRect(0, f0[1], w, h);
       ctx.beginPath();
       ctx.moveTo(f0[0], f0[1]); ctx.lineTo(f1[0], f1[1]);
-      ctx.strokeStyle = "rgba(110, 170, 200, 0.22)";
+      ctx.strokeStyle = "rgba(90, 160, 200, 0.18)";
       ctx.lineWidth = 1 * dpr;
       ctx.stroke();
     }
@@ -253,16 +237,20 @@
     function glowRibbon(pts, toS, dpr, width, alpha) {
       curve(pts, toS, false);
       ctx.save();
-      ctx.strokeStyle = `rgba(70, 190, 255, ${alpha * 0.35})`;
-      ctx.shadowColor = "rgba(80, 210, 255, 0.9)";
-      ctx.shadowBlur = 16 * dpr;
-      ctx.lineWidth = width * 2.2;
+      ctx.strokeStyle = `rgba(40, 180, 255, ${alpha * 0.28})`;
+      ctx.shadowColor = "rgba(60, 210, 255, 1)";
+      ctx.shadowBlur = 22 * dpr;
+      ctx.lineWidth = width * 2.6;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke();
+      ctx.shadowBlur = 8 * dpr;
+      ctx.strokeStyle = `rgba(90, 210, 255, ${alpha * 0.7})`;
+      ctx.lineWidth = width * 1.15;
+      ctx.stroke();
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = `rgba(190, 235, 255, ${alpha})`;
-      ctx.lineWidth = width * 0.55;
+      ctx.strokeStyle = `rgba(210, 245, 255, ${alpha})`;
+      ctx.lineWidth = Math.max(1, width * 0.38);
       ctx.stroke();
       ctx.restore();
     }
@@ -288,148 +276,79 @@
 
     function drawSmoke(toS, s, dpr, now) {
       const upper = upperBody(s.hf, s.hr);
-      const phase = (now / 2400) * (s.V / 30);
-      const offsets = [0.045, 0.09, 0.15, 0.23, 0.34, 0.50, 0.72, 1.02, 1.38];
+      const phase = (now / 2600) * (s.V / 30);
+      const offsets = [0.028, 0.062, 0.11, 0.175, 0.26, 0.38, 0.56];
       offsets.forEach((d, i) => {
-        const rib = [[-0.9, upper[0][1] + d], ...offsetRibbon(upper, d)];
+        const rib = [[-1.0, upper[0][1] + d * 0.55], ...offsetRibbon(upper, d)];
         const tail = rib[rib.length - 1];
-        const open = 0.04 + i * 0.025;
-        rib.push([tail[0] + 0.35, tail[1] + open * 0.3], [5.25, tail[1] + open]);
-        glowRibbon(rib, toS, dpr, (1.15 + i * 0.04) * dpr, 0.55 - i * 0.035);
-        const p = along(rib, phase + i * 0.11);
+        const open = 0.05 + i * 0.04;
+        rib.push([tail[0] + 0.28, tail[1] + open * 0.35], [5.55, tail[1] + open]);
+        glowRibbon(rib, toS, dpr, (1.35 + i * 0.06) * dpr, 0.62 - i * 0.05);
+        const p = along(rib, phase + i * 0.09);
         const q = toS(p[0], p[1]);
         ctx.beginPath();
-        ctx.arc(q[0], q[1], 1.6 * dpr, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(220, 245, 255, 0.9)";
+        ctx.arc(q[0], q[1], 1.4 * dpr, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(230, 250, 255, 0.85)";
         ctx.fill();
       });
       const hAvg = 0.5 * (s.hf + s.hr);
       const nUnder = hAvg < 0.105 ? 4 : hAvg < 0.135 ? 3 : 2;
       for (let i = 0; i < nUnder; i++) {
-        const y = 0.016 + (Math.max(hAvg - 0.025, 0.03)) * (i + 0.4) / nUnder;
-        const under = [[-0.9, y], [0.3, y], [1.4, y * 0.92], [2.5, y], [3.7, y], [4.9, y + 0.03], [5.3, y + 0.08]];
-        glowRibbon(under, toS, dpr, 1.15 * dpr, 0.5);
+        const y = 0.012 + Math.max(hAvg - 0.02, 0.025) * (i + 0.35) / nUnder;
+        const rise = s.diffuserM * 0.7;
+        const under = [
+          [-1.0, y], [0.15, y], [1.2, y * 0.9], [2.4, y],
+          [3.6, y], [4.55, y + rise * 0.4], [5.5, y + 0.06 + rise],
+        ];
+        glowRibbon(under, toS, dpr, 1.2 * dpr, 0.55);
       }
     }
 
-    function wheelGeom(toS, ax) {
-      const c = toS(ax, WHEEL_R);
-      const r = Math.abs(toS(ax + WHEEL_R, WHEEL_R)[0] - c[0]);
-      const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
-      return { c, r, rWell };
-    }
-
-    function drawCar(toS, s, dpr) {
-      const upper = upperBody(s.hf, s.hr);
-      const body = closedBody(s);
-      const yf = (x, y) => py(x, y, s.hf, s.hr);
-
-      curve(body, toS, true);
-      const g0 = toS(2.4, 1.43), g1 = toS(2.4, 0.16);
-      const paint = ctx.createLinearGradient(0, g0[1], 0, g1[1]);
-      paint.addColorStop(0, "#d8dee6");
-      paint.addColorStop(0.35, "#9aa7b4");
-      paint.addColorStop(0.7, "#6d7884");
-      paint.addColorStop(1, "#3e4650");
-      ctx.fillStyle = paint;
-      ctx.fill();
+    function drawCarPhoto(toS, s, dpr) {
+      if (!carImg.complete || !carImg.naturalWidth) return;
+      const span = CAR_U1 - CAR_U0;
+      const mPerV = H / (CAR_VG - CAR_VR);
+      const xL = -CAR_U0 / span * LEN;
+      const xR = LEN + (1 - CAR_U1) / span * LEN;
+      const yTop = CAR_VG * mPerV - STOCK + pitchY(LEN * 0.5, s.hf, s.hr);
+      const yBot = (CAR_VG - 1) * mPerV - STOCK + pitchY(LEN * 0.5, s.hf, s.hr);
+      const p0 = toS(xL, yTop), p1 = toS(xR, yBot);
+      const dw = p1[0] - p0[0], dh = p1[1] - p0[1];
+      const pivot = toS(AXLES[0] + WB * 0.5, 0);
+      const ang = Math.atan2(s.hr - s.hf, WB);
 
       ctx.save();
-      ctx.clip();
-      const spec = ctx.createLinearGradient(0, g0[1], 0, g1[1]);
-      spec.addColorStop(0, "rgba(255,255,255,0.28)");
-      spec.addColorStop(0.22, "rgba(255,255,255,0)");
-      ctx.fillStyle = spec;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.translate(pivot[0], pivot[1]);
+      ctx.rotate(-ang);
+      ctx.translate(-pivot[0], -pivot[1]);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.filter = "brightness(0.82) contrast(1.12) saturate(0.85)";
+      ctx.drawImage(carImg, p0[0], p0[1], dw, dh);
+      ctx.filter = "none";
       ctx.restore();
 
-      ctx.save();
-      ctx.globalCompositeOperation = "destination-out";
-      AXLES.forEach((ax) => {
-        const { c, rWell } = wheelGeom(toS, ax);
-        ctx.beginPath(); ctx.arc(c[0], c[1], rWell, 0, Math.PI * 2); ctx.fill();
-      });
-      ctx.restore();
-
-      curve(upper, toS, false);
-      ctx.strokeStyle = "rgba(20, 24, 30, 0.55)";
-      ctx.lineWidth = 1.1 * dpr;
-      ctx.lineJoin = "round";
-      ctx.stroke();
-
-      const glass = [
-        yf(1.30, 0.86), yf(1.44, 1.06), yf(1.60, 1.24), yf(1.80, 1.36),
-        yf(2.05, 1.405), yf(2.40, 1.412), yf(2.78, 1.405), yf(3.08, 1.385),
-        yf(3.32, 1.30), yf(3.55, 1.16), yf(3.42, 1.05), yf(2.55, 1.175),
-        yf(1.95, 1.175), yf(1.42, 0.84),
-      ];
-      curve(glass, toS, true);
-      const gg = ctx.createLinearGradient(0, toS(2.4, 1.41)[1], 0, toS(2.4, 0.86)[1]);
-      gg.addColorStop(0, "rgba(55, 85, 110, 0.72)");
-      gg.addColorStop(1, "rgba(18, 28, 40, 0.82)");
-      ctx.fillStyle = gg;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(200, 220, 235, 0.18)";
-      ctx.lineWidth = 0.8 * dpr;
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(12, 14, 18, 0.45)";
-      ctx.lineWidth = 2.2 * dpr;
-      curve([yf(1.95, 1.40), yf(1.98, 0.92)], toS, false); ctx.stroke();
-      curve([yf(2.72, 1.40), yf(2.78, 0.93)], toS, false); ctx.stroke();
-
-      ctx.strokeStyle = "rgba(30, 34, 40, 0.28)";
-      ctx.lineWidth = 1 * dpr;
-      curve([yf(1.55, 0.90), yf(1.72, 0.72), yf(2.55, 0.73), yf(3.55, 0.92)], toS, false); ctx.stroke();
-      curve([yf(2.15, 0.73), yf(2.18, 0.22)], toS, false); ctx.stroke();
-      curve([yf(3.15, 0.78), yf(3.22, 0.22)], toS, false); ctx.stroke();
-
-      const hl = [yf(0.02, 0.54), yf(0.10, 0.57), yf(0.28, 0.575), yf(0.32, 0.55), yf(0.12, 0.52), yf(0.02, 0.50)];
-      curve(hl, toS, true);
-      ctx.fillStyle = "rgba(230, 240, 255, 0.55)";
-      ctx.fill();
-
-      const tl = [yf(4.58, 0.92), yf(4.68, 0.88), yf(4.70, 0.78), yf(4.60, 0.80), yf(4.52, 0.88)];
-      curve(tl, toS, true);
-      ctx.fillStyle = "rgba(180, 30, 40, 0.75)";
-      ctx.fill();
-
-      const mir = [yf(1.48, 0.92), yf(1.62, 0.96), yf(1.64, 0.90), yf(1.52, 0.86)];
-      curve(mir, toS, true);
-      ctx.fillStyle = "#2a3138";
-      ctx.fill();
-
-      AXLES.forEach((ax) => {
-        const { c, r, rWell } = wheelGeom(toS, ax);
-        ctx.beginPath();
-        ctx.arc(c[0], c[1], rWell, Math.PI * 1.06, Math.PI * 1.94, true);
-        ctx.strokeStyle = "rgba(30, 34, 40, 0.7)";
-        ctx.lineWidth = 1.4 * dpr;
+      if (s.splitterM > 0.004) {
+        const y = s.hf - 0.012;
+        curve([[-s.splitterM, y], [0.12, y], [0.12, y - 0.018], [-s.splitterM, y - 0.018]], toS, true);
+        ctx.fillStyle = "#121416";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(180,200,220,0.25)";
+        ctx.lineWidth = 0.8 * dpr;
         ctx.stroke();
-
-        ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
-        ctx.fillStyle = "#121417"; ctx.fill();
-        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.78, 0, Math.PI * 2);
-        ctx.fillStyle = "#1c2026"; ctx.fill();
-        ctx.strokeStyle = "#8b93a0"; ctx.lineWidth = 1.5 * dpr; ctx.stroke();
-
-        ctx.save();
-        ctx.translate(c[0], c[1]);
-        ctx.strokeStyle = "#4a5360";
-        ctx.lineWidth = 1.15 * dpr;
-        for (let k = 0; k < 14; k++) {
-          ctx.rotate(Math.PI / 7);
-          ctx.beginPath();
-          ctx.moveTo(r * 0.12, 0);
-          ctx.lineTo(r * 0.70, r * 0.08);
-          ctx.stroke();
-        }
-        ctx.restore();
-        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.18, 0, Math.PI * 2);
-        ctx.fillStyle = "#5a6370"; ctx.fill();
-        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.07, 0, Math.PI * 2);
-        ctx.fillStyle = "#2a3038"; ctx.fill();
-      });
+      }
+      if (s.wingM > 0.008) {
+        const xLe = 4.18, y0 = 1.02 - STOCK + pitchY(xLe, s.hf, s.hr);
+        curve([
+          [xLe, y0], [xLe + 0.05, y0 + 0.018], [xLe + s.wingM, y0 + 0.028],
+          [xLe + s.wingM, y0 + 0.006], [xLe + 0.04, y0 - 0.004],
+        ], toS, true);
+        ctx.fillStyle = "#1a1d22";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(200,220,235,0.3)";
+        ctx.lineWidth = 0.8 * dpr;
+        ctx.stroke();
+      }
     }
 
     function frame(now) {
@@ -438,8 +357,8 @@
       const toS = worldToScreen(s);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawTunnel(toS, dpr);
+      drawCarPhoto(toS, s, dpr);
       drawSmoke(toS, s, dpr, now);
-      drawCar(toS, s, dpr);
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
