@@ -11,9 +11,10 @@ The locked `outline` is a single closed body polyline: nose, hood, cabin,
 fastback, ducktail, rear fascia, underbody. Wheel holes are NOT cut — 20"
 wheels are drawn separately as filled circles (see `wheel_meta`).
 
-Ride height shifts the whole body so stock chin/underbody sits at h = 0.128 m.
-Splitter grows FORWARD from the chin (x = 0). Wing sits on the ducktail
-(~4.52, 0.975 at stock). Diffuser kicks the rear underbody up.
+Ride height pitches the body so the underbody sits at h_f at the front
+axle and h_r at the rear axle (rake = h_r - h_f). Stock both 0.128 m.
+Splitter/wing/diffuser are EXTRA millimetres on the Highland polyline
+(stock aero already includes factory parts).
 """
 
 from __future__ import annotations
@@ -70,6 +71,9 @@ _WRAP_UNDER_I = 24
 STOCK_CHIN_Y = float(HIGHLAND_POLY[0, 1])  # 0.155 m as drawn
 STOCK_H_M = STOCK_RIDE_HEIGHT_MM / 1000.0  # 0.128 m
 
+X_FRONT_AXLE_M = FRONT_OVERHANG_M  # 0.845 m
+X_REAR_AXLE_M = FRONT_OVERHANG_M + WHEELBASE_M  # 3.72 m
+
 # Visual 20" Performance wheels (not cut into the outline).
 WHEEL_R_M = 0.325
 WHEEL_FRONT_X_M = 0.85
@@ -78,6 +82,18 @@ WHEEL_REAR_X_M = 3.72
 # Aliases expected by tests / app.py
 HIGHLAND_UPPER_STOCK = HIGHLAND_POLY
 
+
+def ride_plane_y(x, h_f: float, h_r: float):
+    """Underbody y at x: linear rake through the axles (h_f front, h_r rear)."""
+    x_arr = np.asarray(x, dtype=float)
+    scalar = x_arr.ndim == 0
+    x_arr = np.atleast_1d(x_arr)
+    span = X_REAR_AXLE_M - X_FRONT_AXLE_M
+    t = (x_arr - X_FRONT_AXLE_M) / span
+    y = h_f + t * (h_r - h_f)
+    if scalar:
+        return float(y[0])
+    return y
 
 
 def wheel_meta() -> list[dict]:
@@ -126,27 +142,42 @@ def _flat(x0: float, x1: float, y: float, n: int = 6) -> np.ndarray:
     return np.column_stack([xs, np.full(n, y)])
 
 
+def _rake_line(x0: float, x1: float, h_f: float, h_r: float, n: int = 8) -> np.ndarray:
+    xs = np.linspace(float(x0), float(x1), n)
+    ys = ride_plane_y(xs, h_f, h_r)
+    return np.column_stack([xs, np.asarray(ys).ravel()])
+
+
 def build_outline(
     ride_height_mm: float,
     splitter_mm: float,
     rear_wing_mm: float,
     diffuser_mm: float,
+    ride_height_rear_mm: float | None = None,
 ) -> np.ndarray:
     """Return an (N, 2) closed polyline in world meters (first point repeated).
 
     Part knobs are API millimetres of length (ride height, splitter extension,
     rear-wing chord, diffuser length e). Wheel holes are not cut.
+
+    ``ride_height_mm`` is the front (or level) ride height. If
+    ``ride_height_rear_mm`` is omitted, the car is level (h_f = h_r).
     """
-    rh = float(ride_height_mm) / 1000.0
+    h_f = float(ride_height_mm) / 1000.0
+    h_r = float(
+        ride_height_rear_mm
+        if ride_height_rear_mm is not None
+        else ride_height_mm
+    ) / 1000.0
     split = float(splitter_mm) / 1000.0
     chord = float(rear_wing_mm) / 1000.0
     e = float(diffuser_mm) / 1000.0
-    # Body heaves with ride height; stock drawing is at h = 0.128 m.
-    dy = rh - STOCK_H_M
-    ub = rh  # underbody world y
+
+    def ub(x) -> float:
+        return float(ride_plane_y(x, h_f, h_r))
 
     shifted = HIGHLAND_POLY.copy()
-    shifted[:, 1] = shifted[:, 1] + dy
+    shifted[:, 1] = shifted[:, 1] + (ride_plane_y(shifted[:, 0], h_f, h_r) - STOCK_H_M)
 
     pts: list[np.ndarray] = []
 
@@ -162,46 +193,51 @@ def build_outline(
 
     # Diffuser: length e (meters) of underbody ramp at the tail. 0 => wrap-under
     # as drawn. Visual rise only (forces use e, not an angle).
-    rise = min(0.40 * e, 0.12) if e > 0.001 else 0.0
-    y_exit = min(ub + rise, ub + 0.28)
     x_rear_ub = float(shifted[-1, 0])  # 4.55 m
+    ub_rear = ub(x_rear_ub)
+    rise = min(0.40 * e, 0.12) if e > 0.001 else 0.0
+    y_exit = min(ub_rear + rise, ub_rear + 0.28)
     x_diff_start = (x_rear_ub - e) if e > 0.001 else x_rear_ub
 
     if e > 0.001:
         wrap_x = float(HIGHLAND_POLY[_WRAP_UNDER_I, 0])  # 4.70
-        wrap_y = float(HIGHLAND_POLY[_WRAP_UNDER_I, 1]) + dy
+        wrap_y = float(HIGHLAND_POLY[_WRAP_UNDER_I, 1]) + (ub(wrap_x) - STOCK_H_M)
+        x_mid = x_rear_ub - 0.35 * e
         pts.append(
             np.array(
                 [
                     (wrap_x, wrap_y + rise),
                     (x_rear_ub, y_exit),
-                    (x_rear_ub - 0.35 * e, ub + 0.55 * (y_exit - ub)),
-                    (x_diff_start, ub),
+                    (x_mid, ub(x_mid) + 0.55 * (y_exit - ub_rear)),
+                    (x_diff_start, ub(x_diff_start)),
                 ],
                 dtype=float,
             )
         )
     else:
         pts.append(shifted[_WRAP_UNDER_I:])  # wrap-under + rear chin
-        pts.append(np.array([(x_rear_ub, ub)], dtype=float))
+        pts.append(np.array([(x_rear_ub, ub_rear)], dtype=float))
 
-    # Flat underbody, rear-to-front, down to the chin plane.
+    # Raked underbody, rear-to-front, down to the chin plane.
     x_ub_aft = x_diff_start if e > 0.001 else x_rear_ub
-    pts.append(_flat(x_ub_aft, 0.12, ub, n=6))
+    pts.append(_rake_line(x_ub_aft, 0.12, h_f, h_r, n=8))
 
     # Front: splitter grows FORWARD from the chin (x = 0). Thin plate at
-    # underbody height with a small droop lip.
-    y_split = ub - 0.008
+    # local underbody height with a small droop lip.
+    y0 = ub(0.00)
+    y12 = ub(0.12)
+    y_split = y0 - 0.008
     if split > 0.001:
+        y_tip = ub(-split) - 0.008
         front = np.array(
             [
-                (0.12, ub),
-                (0.02, ub),
+                (0.12, y12),
+                (0.02, ub(0.02)),
                 (0.00, y_split),
-                (-split, y_split),
-                (-split, y_split - 0.018),
-                (-split + min(0.012, 0.25 * split), y_split - 0.018),
-                (0.00, ub + (STOCK_CHIN_Y - STOCK_H_M)),
+                (-split, y_tip),
+                (-split, y_tip - 0.018),
+                (-split + min(0.012, 0.25 * split), y_tip - 0.018),
+                (0.00, y0 + (STOCK_CHIN_Y - STOCK_H_M)),
             ],
             dtype=float,
         )
@@ -209,9 +245,9 @@ def build_outline(
         # Short chin face from underbody up to the drawn chin, then close.
         front = np.array(
             [
-                (0.12, ub),
-                (0.00, ub),
-                (0.00, ub + (STOCK_CHIN_Y - STOCK_H_M)),
+                (0.12, y12),
+                (0.00, y0),
+                (0.00, y0 + (STOCK_CHIN_Y - STOCK_H_M)),
             ],
             dtype=float,
         )
@@ -270,11 +306,18 @@ def underbody_sample_points(
     outline: np.ndarray,
     ride_height_mm: float,
     n: int = 12,
+    ride_height_rear_mm: float | None = None,
 ) -> np.ndarray:
     """Points along the underbody channel (between the wheels)."""
-    rh = ride_height_mm / 1000.0
+    h_f = ride_height_mm / 1000.0
+    h_r = (
+        ride_height_rear_mm / 1000.0
+        if ride_height_rear_mm is not None
+        else h_f
+    )
     x_fa = FRONT_OVERHANG_M
     x_ra = FRONT_OVERHANG_M + WHEELBASE_M
     xs = np.linspace(x_fa + 0.45, x_ra - 0.45, n)
-    ys = np.full(n, max(rh * 0.5, 0.03))
+    ys_ub = ride_plane_y(xs, h_f, h_r)
+    ys = np.maximum(np.asarray(ys_ub).ravel() * 0.5, 0.03)
     return np.column_stack([xs, ys])
