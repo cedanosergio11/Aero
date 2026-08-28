@@ -50,6 +50,10 @@ def test_simulate_schema():
         assert isinstance(f[k], (int, float))
     # Optional meta must not break locked fields.
     assert "forces" in body and "flow" in body
+    assert "forcesAtMph" in body
+    assert "60" in body["forcesAtMph"] and "130" in body["forcesAtMph"]
+    for label in ("60", "130"):
+        assert FORCE_KEYS <= set(body["forcesAtMph"][label])
 
 
 def test_stock_street_aero_at_30mps():
@@ -66,6 +70,122 @@ def test_stock_street_aero_at_30mps():
     assert abs(f["downforceN"] - (-qA * -0.05)) < 1e-6
 
 
+def test_stock_via_front_rear_128():
+    payload = {
+        "airspeedMps": 30.0,
+        "rideHeightFrontMm": 128.0,
+        "rideHeightRearMm": 128.0,
+        "splitter": 0.0,
+        "rearWing": 0.0,
+        "diffuser": 0.0,
+    }
+    r = client.post("/simulate", json=payload)
+    assert r.status_code == 200, r.text
+    f = r.json()["forces"]
+    assert abs(f["cd"] - 0.219) < 1e-9
+    assert abs(f["cl"] - (-0.05)) < 1e-9
+    assert abs(f["balancePct"] - 42.0) < 0.51
+
+
+def test_old_ride_height_mm_still_works():
+    a = client.post("/simulate", json=BASE).json()["forces"]
+    b = client.post(
+        "/simulate",
+        json={**BASE, "rideHeightFrontMm": 128.0, "rideHeightRearMm": 128.0},
+    ).json()["forces"]
+    for k in FORCE_KEYS:
+        assert abs(a[k] - b[k]) < 1e-9
+
+
+def test_rake_changes_cd_cl_and_balance():
+    stock = client.post("/simulate", json=BASE).json()["forces"]
+    payload = {
+        k: v for k, v in BASE.items() if k != "rideHeightMm"
+    } | {
+        "rideHeightFrontMm": 100.0,
+        "rideHeightRearMm": 140.0,
+    }
+    rake = client.post("/simulate", json=payload)
+    assert rake.status_code == 200, rake.text
+    f = rake.json()["forces"]
+    h_f, h_r = 0.100, 0.140
+    h_avg = 0.5 * (h_f + h_r)
+    rake_m = h_r - h_f
+    cd_exp = 0.219 + 0.15 * (h_avg - 0.128) - 0.10 * rake_m + 0.8 * rake_m ** 2
+    cl_exp = -0.05 + 1.2 * (h_avg - 0.128) - 2.5 * rake_m
+    assert abs(f["cd"] - cd_exp) < 1e-9
+    assert abs(f["cl"] - cl_exp) < 1e-9
+    assert f["cd"] != stock["cd"]
+    assert f["cl"] != stock["cl"]
+    assert f["balancePct"] != stock["balancePct"]
+    # Nose-down rake puts extra downforce on the front.
+    assert f["balancePct"] > stock["balancePct"]
+    assert f["cl"] < stock["cl"]  # more downforce (SAE)
+
+
+def test_front_rear_win_over_ride_height_mm():
+    mixed = client.post(
+        "/simulate",
+        json={
+            **BASE,
+            "rideHeightMm": 128.0,
+            "rideHeightFrontMm": 100.0,
+            "rideHeightRearMm": 140.0,
+        },
+    )
+    only = client.post(
+        "/simulate",
+        json={
+            "airspeedMps": 30.0,
+            "rideHeightFrontMm": 100.0,
+            "rideHeightRearMm": 140.0,
+            "splitter": 0.0,
+            "rearWing": 0.0,
+            "diffuser": 0.0,
+        },
+    )
+    assert mixed.status_code == 200 and only.status_code == 200
+    a, b = mixed.json()["forces"], only.json()["forces"]
+    for k in FORCE_KEYS:
+        assert abs(a[k] - b[k]) < 1e-9
+    stock = client.post("/simulate", json=BASE).json()["forces"]
+    assert abs(a["cd"] - stock["cd"]) > 1e-6
+
+
+def test_forces_at_mph_scale_with_v_squared():
+    body = client.post("/simulate", json=BASE).json()
+    a = body["forcesAtMph"]["60"]
+    b = body["forcesAtMph"]["130"]
+    f = body["forces"]
+    assert abs(a["cd"] - f["cd"]) < 1e-12
+    assert abs(b["cd"] - f["cd"]) < 1e-12
+    assert abs(a["cl"] - f["cl"]) < 1e-12
+    assert abs(b["cl"] - f["cl"]) < 1e-12
+    v60, v130 = 26.82, 58.12
+    ratio = (v130 / v60) ** 2
+    assert abs(b["downforceN"] / a["downforceN"] - ratio) < 1e-6
+    assert abs(b["dragN"] / a["dragN"] - ratio) < 1e-6
+    assert 4.6 < ratio < 4.8
+    assert abs(a["balancePct"] - b["balancePct"]) < 1e-9
+
+
+def test_extras_add_on_top_of_stock():
+    stock = client.post("/simulate", json=BASE).json()["forces"]
+    kit = client.post(
+        "/simulate",
+        json={**BASE, "splitter": 80.0, "rearWing": 200.0, "diffuser": 100.0},
+    ).json()["forces"]
+    # Extra mm on top of stock polar (factory parts already in 0.219 / -0.05).
+    s, c, e = 0.080, 0.200, 0.100
+    cd_exp = 0.219 + 0.08 * s + 0.35 * c - 0.04 * e
+    cl_exp = -0.05 - 1.8 * s - 2.2 * c - 1.4 * e
+    assert abs(kit["cd"] - cd_exp) < 1e-9
+    assert abs(kit["cl"] - cl_exp) < 1e-9
+    assert kit["cd"] > stock["cd"]
+    assert kit["cl"] < stock["cl"]
+    assert kit["downforceN"] > stock["downforceN"]
+
+
 def test_airspeed_changes_drag_quadratic():
     a = client.post("/simulate", json={**BASE, "airspeedMps": 20.0}).json()
     b = client.post("/simulate", json={**BASE, "airspeedMps": 40.0}).json()
@@ -74,6 +194,7 @@ def test_airspeed_changes_drag_quadratic():
     # Drag ~ V^2: doubling speed ~ 4x drag (Cd is speed-independent).
     ratio = d40 / d20
     assert 3.2 < ratio < 4.8
+    assert abs(a["forces"]["cd"] - b["forces"]["cd"]) < 1e-12
 
 
 def test_zero_speed_zero_forces():
@@ -84,6 +205,8 @@ def test_zero_speed_zero_forces():
     assert f["downforceN"] == 0
     assert f["frontN"] == 0
     assert f["rearN"] == 0
+    # 60/130 mph snapshots still have speed.
+    assert r.json()["forcesAtMph"]["60"]["dragN"] > 0
 
 
 def test_airspeed_mph_accepted():
@@ -158,6 +281,33 @@ def test_ride_height_changes_outline_and_forces():
     assert low["forces"]["downforceN"] > high["forces"]["downforceN"]
 
 
+def test_rake_pitches_outline():
+    level = _outline(client.post("/simulate", json=BASE).json())
+    rake = _outline(
+        client.post(
+            "/simulate",
+            json={
+                "airspeedMps": 30.0,
+                "rideHeightFrontMm": 100.0,
+                "rideHeightRearMm": 140.0,
+                "splitter": 0.0,
+                "rearWing": 0.0,
+                "diffuser": 0.0,
+            },
+        ).json()
+    )
+    assert not np.allclose(level, rake) if level.shape == rake.shape else True
+    # Underbody near the front axle should sit ~0.100 m; rear axle ~0.140 m.
+    def ub_y(poly, x):
+        ub = poly[poly[:, 1] < 0.28]
+        order = np.argsort(ub[:, 0])
+        ub = ub[order]
+        return float(np.interp(x, ub[:, 0], ub[:, 1]))
+
+    assert abs(ub_y(rake, 0.845) - 0.100) < 0.012
+    assert abs(ub_y(rake, 3.72) - 0.140) < 0.012
+
+
 def test_validation_rejects_out_of_range():
     r = client.post("/simulate", json={**BASE, "rideHeightMm": 10.0})
     assert r.status_code == 422
@@ -171,12 +321,31 @@ def test_validation_rejects_out_of_range():
     assert r.status_code == 422
     r = client.post("/simulate", json={k: v for k, v in BASE.items() if k != "airspeedMps"})
     assert r.status_code == 422
+    r = client.post(
+        "/simulate",
+        json={k: v for k, v in BASE.items() if k != "rideHeightMm"},
+    )
+    assert r.status_code == 422
+    r = client.post("/simulate", json={**BASE, "rideHeightFrontMm": 70.0})
+    assert r.status_code == 422
 
 
 def test_validation_accepts_new_range_edges():
     r = client.post("/simulate", json={**BASE, "rideHeightMm": 80.0, "splitter": 120.0, "rearWing": 280.0, "diffuser": 200.0})
     assert r.status_code == 200, r.text
     r = client.post("/simulate", json={**BASE, "rideHeightMm": 160.0})
+    assert r.status_code == 200, r.text
+    r = client.post(
+        "/simulate",
+        json={
+            "airspeedMps": 30.0,
+            "rideHeightFrontMm": 80.0,
+            "rideHeightRearMm": 160.0,
+            "splitter": 0.0,
+            "rearWing": 0.0,
+            "diffuser": 0.0,
+        },
+    )
     assert r.status_code == 200, r.text
 
 
