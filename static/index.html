@@ -3,104 +3,123 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>M3P Aero</title>
+  <title>M3P Aero — Tunnel</title>
   <style>
     :root {
-      --bg: #0b0d10;
-      --panel: #14181e;
+      --bg: #05070a;
+      --panel: #0c1016;
       --ink: #e8edf4;
-      --muted: #8b97a8;
-      --line: #2a3340;
+      --muted: #7d8a9a;
+      --line: #1c2430;
       --accent: #e31937;
+      --glow: #3ec7ff;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-      font: 14px/1.4 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+      font: 13px/1.4 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
     header {
-      display: flex; align-items: baseline; gap: 16px;
-      padding: 12px 20px 8px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 12px 20px; border-bottom: 1px solid var(--line);
     }
-    header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
-    header span { color: var(--muted); font-size: 12px; }
-    main { display: grid; grid-template-columns: 260px 1fr; height: calc(100% - 46px); }
-    aside { padding: 12px 16px 16px; border-right: 1px solid var(--line); overflow: auto; }
-    label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 11px;
+    header h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.04em; }
+    header span { color: var(--muted); font-size: 11px; }
+    main { display: grid; grid-template-columns: 280px 1fr; height: calc(100% - 46px); }
+    aside { padding: 12px 16px 18px; border-right: 1px solid var(--line); overflow: auto; }
+    .sec { color: var(--muted); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      margin: 14px 0 6px; }
+    label { display: block; margin: 8px 0 3px; color: var(--muted); font-size: 11px;
       text-transform: uppercase; letter-spacing: 0.08em; }
-    input[type=range] { width: 100%; }
+    input[type=range] { width: 100%; accent-color: var(--glow); }
     .val { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
-    button {
-      width: 100%; margin-top: 14px; padding: 10px;
-      background: var(--accent); color: white; border: 0; border-radius: 6px;
-      font-weight: 600; cursor: pointer;
-    }
-    button:disabled { opacity: 0.5; cursor: wait; }
-    .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-    .num { background: var(--panel); padding: 7px 10px; border-radius: 6px; }
-    .num b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
-    .num span { color: var(--muted); font-size: 11px; }
+    .rake { margin: 8px 0 0; color: var(--glow); font-variant-numeric: tabular-nums; font-size: 12px; }
+    .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .num { background: var(--panel); padding: 7px 9px; border-radius: 5px; border: 1px solid var(--line); }
+    .num b { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .num span { color: var(--muted); font-size: 10px; letter-spacing: 0.04em; }
+    .speeds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .speed { background: var(--panel); padding: 8px 9px; border-radius: 5px; border: 1px solid var(--line); }
+    .speed h3 { margin: 0 0 6px; font-size: 11px; color: var(--glow); letter-spacing: 0.08em;
+      text-transform: uppercase; font-weight: 600; }
+    .speed div { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; font-size: 12px; }
+    .speed div span { color: var(--muted); }
     .warn { margin-top: 12px; color: var(--muted); font-size: 11px; }
-    canvas { width: 100%; height: 100%; display: block; background: #12161c; }
     .err { color: var(--accent); white-space: pre-wrap; font-size: 12px; }
-    @media (max-width: 720px) {
-      main { grid-template-columns: 1fr; grid-template-rows: auto minmax(240px, 1fr);
+    .stage { position: relative; background: #030508; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    @media (max-width: 760px) {
+      main { grid-template-columns: 1fr; grid-template-rows: auto minmax(260px, 1fr);
         height: auto; min-height: calc(100% - 46px); }
       aside { border-right: none; border-bottom: 1px solid var(--line); }
-      canvas { min-height: 240px; height: 50vh; }
+      canvas { min-height: 260px; height: 52vh; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>M3P 2D aero</h1>
-    <span>Highland silhouette · live smoke · street-aero estimates, not Tesla CFD</span>
+    <h1>M3P WIND TUNNEL</h1>
+    <span>2026 Model 3 Performance · street-aero polar · extras on stock</span>
   </header>
   <main>
     <aside>
+      <div class="sec">Freestream</div>
       <label>Airspeed <span class="val" id="vAirspeedMps">30 m/s</span></label>
-      <input id="airspeedMps" type="range" min="0" max="80" step="1" value="30" />
-      <label>Ride height <span class="val" id="vRideHeightMm">128 mm</span></label>
-      <input id="rideHeightMm" type="range" min="80" max="160" step="1" value="128" />
+      <input id="airspeedMps" type="range" min="5" max="80" step="1" value="30" />
+
+      <div class="sec">Ride</div>
+      <label>Front ride height <span class="val" id="vRideHeightFrontMm">128 mm</span></label>
+      <input id="rideHeightFrontMm" type="range" min="80" max="160" step="1" value="128" />
+      <label>Rear ride height <span class="val" id="vRideHeightRearMm">128 mm</span></label>
+      <input id="rideHeightRearMm" type="range" min="80" max="160" step="1" value="128" />
+      <div class="rake" id="rakeReadout">Rake 0 mm</div>
+
+      <div class="sec">Extras on stock</div>
       <label>Splitter <span class="val" id="vSplitter">0 mm</span></label>
       <input id="splitter" type="range" min="0" max="120" step="1" value="0" />
       <label>Rear wing <span class="val" id="vRearWing">0 mm</span></label>
       <input id="rearWing" type="range" min="0" max="280" step="1" value="0" />
       <label>Diffuser <span class="val" id="vDiffuser">0 mm</span></label>
       <input id="diffuser" type="range" min="0" max="200" step="1" value="0" />
-      <button id="go">Simulate</button>
+
+      <div class="sec">Live · slider speed</div>
       <div class="nums">
         <div class="num"><span>Cd</span><b id="cd">—</b></div>
         <div class="num"><span>Cl (SAE)</span><b id="cl">—</b></div>
         <div class="num"><span>Drag</span><b id="dragN">—</b></div>
         <div class="num"><span>Downforce</span><b id="downforceN">—</b></div>
-        <div class="num"><span>Front axle</span><b id="frontN">—</b></div>
-        <div class="num"><span>Rear axle</span><b id="rearN">—</b></div>
-        <div class="num"><span>Balance % front</span><b id="balancePct">—</b></div>
-        <div class="num"><span>ms</span><b id="ms">—</b></div>
+        <div class="num"><span>Front</span><b id="frontN">—</b></div>
+        <div class="num"><span>Rear</span><b id="rearN">—</b></div>
+        <div class="num"><span>Balance F</span><b id="balancePct">—</b></div>
+        <div class="num"><span>Solve</span><b id="ms">—</b></div>
       </div>
-      <p class="warn">x aft-positive, y up, y=0 ground. Forces from ChainBear
-        street-aero polar (SAE Cl: negative = downforce). Flow is pictorial.
-        Not 3D CFD.</p>
+
+      <div class="sec">Street vs track</div>
+      <div class="speeds" id="speedPair">
+        <div class="speed">
+          <h3>60 mph</h3>
+          <div><span>Drag</span><b id="d60">—</b></div>
+          <div><span>Downforce</span><b id="l60">—</b></div>
+          <div><span>Balance</span><b id="b60">—</b></div>
+        </div>
+        <div class="speed">
+          <h3>130 mph</h3>
+          <div><span>Drag</span><b id="d130">—</b></div>
+          <div><span>Downforce</span><b id="l130">—</b></div>
+          <div><span>Balance</span><b id="b130">—</b></div>
+        </div>
+      </div>
+      <p class="warn">Stock Cd 0.219 already includes factory splitter, spoiler, and diffuser.
+        Sliders are extra. Polar does not change with speed; forces scale with q. Not Tesla CFD.</p>
       <p class="err" id="err"></p>
     </aside>
-    <canvas id="c"></canvas>
+    <div class="stage"><canvas id="c"></canvas></div>
   </main>
   <script>
     const $ = (id) => document.getElementById(id);
-    const fields = ["airspeedMps", "rideHeightMm", "splitter", "rearWing", "diffuser"];
-    const units = { airspeedMps: " m/s", rideHeightMm: " mm", splitter: " mm", rearWing: " mm", diffuser: " mm" };
-    fields.forEach((id) => {
-      $(id).addEventListener("input", () => {
-        $("v" + id.charAt(0).toUpperCase() + id.slice(1)).textContent = $(id).value + units[id];
-        scheduleSim();
-      });
-    });
-
     const canvas = $("c");
     const ctx = canvas.getContext("2d");
-    const BG = "#12161c";
-
-    // Tall bluff fascia, short hood, cab-forward glass, liftback, ducktail.
-    const UPPER = [
+    const STOCK = 0.128, LEN = 4.724, WHEEL_R = 0.325, WELL_R = 0.368;
+    const AXLES = [0.85, 3.72];
+    const UPPER0 = [
       [0.00, 0.16], [0.00, 0.58], [0.06, 0.64], [0.16, 0.66],
       [0.40, 0.66], [0.70, 0.67], [1.00, 0.70],
       [1.16, 0.88], [1.32, 1.12], [1.52, 1.30], [1.75, 1.40],
@@ -109,12 +128,6 @@
       [4.38, 0.93], [4.50, 0.96], [4.56, 1.05], [4.64, 0.98],
       [4.70, 0.76], [4.724, 0.40], [4.68, 0.22], [4.48, 0.16],
     ];
-    const STOCK_H = 0.128;
-    const WHEEL_R = 0.325;
-    const WELL_R = 0.368;
-    const AXLES = [0.85, 3.72];
-    const N_PARTICLES = 220;
-    const TRAIL = 22;
 
     function resize() {
       const r = canvas.getBoundingClientRect();
@@ -124,108 +137,77 @@
     window.addEventListener("resize", resize);
     resize();
 
-    let last = null;
-    let particles = [];
-    let simTimer = null;
+    const bind = [
+      ["airspeedMps", " m/s"],
+      ["rideHeightFrontMm", " mm"],
+      ["rideHeightRearMm", " mm"],
+      ["splitter", " mm"],
+      ["rearWing", " mm"],
+      ["diffuser", " mm"],
+    ];
+    bind.forEach(([id, u]) => {
+      $(id).addEventListener("input", () => {
+        $("v" + id.charAt(0).toUpperCase() + id.slice(1)).textContent = $(id).value + u;
+        const rake = Number($("rideHeightRearMm").value) - Number($("rideHeightFrontMm").value);
+        $("rakeReadout").textContent = "Rake " + (rake >= 0 ? "+" : "") + rake + " mm";
+        scheduleSim();
+      });
+    });
 
-    function currentSetup() {
+    let last = null, t0 = performance.now(), simTimer = null;
+
+    function setup() {
       return {
-        h: Number($("rideHeightMm").value) / 1000,
+        V: Number($("airspeedMps").value),
+        hf: Number($("rideHeightFrontMm").value) / 1000,
+        hr: Number($("rideHeightRearMm").value) / 1000,
         splitterM: Number($("splitter").value) / 1000,
         wingM: Number($("rearWing").value) / 1000,
         diffuserM: Number($("diffuser").value) / 1000,
       };
     }
-
-    function upperBody(h) {
-      const dy = h - STOCK_H;
-      return UPPER.map(([x, y]) => [x, y + dy]);
+    function pitchY(x, hf, hr) {
+      const t = Math.max(0, Math.min(1, x / LEN));
+      return hf + (hr - hf) * t;
     }
-
-    function closedBody(h, splitterM, wingM, diffuserM) {
-      const upper = upperBody(h);
+    function upperBody(hf, hr) {
+      return UPPER0.map(([x, y]) => [x, y - STOCK + pitchY(x, hf, hr)]);
+    }
+    function closedBody(s) {
+      const upper = upperBody(s.hf, s.hr);
       const pts = upper.slice();
-      if (wingM > 0.004) {
+      if (s.wingM > 0.004) {
         const duck = upper[21];
-        const xLe = duck[0] - 0.05;
-        const y0 = duck[1] + 0.04;
-        pts.push([xLe, y0], [xLe + 0.05, y0 + 0.028], [xLe + wingM, y0 + 0.04],
-                 [xLe + wingM, y0 + 0.01], [xLe, y0]);
+        const xLe = duck[0] - 0.05, y0 = duck[1] + 0.04;
+        pts.push([xLe, y0], [xLe + 0.05, y0 + 0.028], [xLe + s.wingM, y0 + 0.04],
+                 [xLe + s.wingM, y0 + 0.01], [xLe, y0]);
       }
-      const rise = Math.min(diffuserM * 0.9, 0.22);
-      const tail = upper[upper.length - 1];
-      pts.push([4.724, h + rise]);
-      if (diffuserM > 0.001) pts.push([4.724 - 1.05, h]);
-      if (splitterM > 0.001) {
-        pts.push([0.10, h]);
-        pts.push([-splitterM, h - 0.01]);
-        pts.push([-splitterM, h - 0.024]);
-        pts.push([0.00, upper[0][1]]);
-      } else {
-        pts.push([0.10, h]);
-        pts.push([0.00, h]);
-        pts.push([0.00, upper[0][1]]);
+      const rise = Math.min(s.diffuserM * 0.9, 0.22);
+      pts.push([LEN, s.hr + rise], [0.12, s.hf]);
+      if (s.splitterM > 0.001) {
+        pts.push([-s.splitterM, s.hf - 0.01], [-s.splitterM, s.hf - 0.022]);
       }
+      pts.push([0, s.hf], [0, upper[0][1]]);
       return pts;
     }
-
-    function glassPoly(h) {
-      const dy = h - STOCK_H;
-      return [
-        [1.20, 0.86 + dy], [1.36, 1.10 + dy], [1.55, 1.28 + dy], [1.78, 1.385 + dy],
-        [2.10, 1.412 + dy], [2.50, 1.412 + dy], [2.90, 1.405 + dy], [3.18, 1.37 + dy],
-        [3.45, 1.24 + dy], [3.62, 1.12 + dy], [3.48, 1.04 + dy], [2.60, 1.16 + dy],
-        [1.90, 1.16 + dy], [1.32, 0.82 + dy],
+    function glassPoly(hf, hr) {
+      const p = [
+        [1.20, 0.86], [1.36, 1.10], [1.55, 1.28], [1.78, 1.385],
+        [2.10, 1.412], [2.50, 1.412], [2.90, 1.405], [3.18, 1.37],
+        [3.45, 1.24], [3.62, 1.12], [3.48, 1.04], [2.60, 1.16],
+        [1.90, 1.16], [1.32, 0.82],
       ];
+      return p.map(([x, y]) => [x, y - STOCK + pitchY(x, hf, hr)]);
     }
-
-    function worldToScreen() {
-      const split = currentSetup().splitterM;
-      const x0 = -0.45 - split, x1 = 5.15, y0 = -0.05, y1 = 1.78;
-      const pad = 28 * devicePixelRatio;
-      const w = canvas.width - 2 * pad, hh = canvas.height - 2 * pad;
-      const sc = Math.min(w / (x1 - x0), hh / (y1 - y0));
+    function worldToScreen(s) {
+      const x0 = -0.9 - s.splitterM, x1 = 5.6, y0 = -0.08, y1 = 1.85;
+      const pad = 36 * devicePixelRatio;
+      const w = canvas.width - 2 * pad, h = canvas.height - 2 * pad;
+      const sc = Math.min(w / (x1 - x0), h / (y1 - y0));
       const ox = pad + (w - sc * (x1 - x0)) / 2;
-      const oy = pad + (hh - sc * (y1 - y0)) / 2;
+      const oy = pad + (h - sc * (y1 - y0)) / 2;
       return (x, y) => [ox + (x - x0) * sc, canvas.height - (oy + (y - y0) * sc)];
     }
-
-    function sampleVel(flow, meta, x, y) {
-      const x0 = (meta && meta.x0 != null) ? meta.x0 : -1.80;
-      const y0 = (meta && meta.y0 != null) ? meta.y0 : 0.04;
-      const nx = flow.nx, ny = flow.ny;
-      const fx = (x - x0) / flow.dx, fy = (y - y0) / flow.dy;
-      if (fx < 0 || fy < 0 || fx > nx - 1 || fy > ny - 1) return [0, 0];
-      const i = Math.floor(fx), j = Math.floor(fy);
-      const i1 = Math.min(i + 1, nx - 1), j1 = Math.min(j + 1, ny - 1);
-      const tx = fx - i, ty = fy - j;
-      const k00 = j * nx + i, k10 = j * nx + i1, k01 = j1 * nx + i, k11 = j1 * nx + i1;
-      const u = (1 - tx) * (1 - ty) * flow.vx[k00] + tx * (1 - ty) * flow.vx[k10]
-              + (1 - tx) * ty * flow.vx[k01] + tx * ty * flow.vx[k11];
-      const v = (1 - tx) * (1 - ty) * flow.vy[k00] + tx * (1 - ty) * flow.vy[k10]
-              + (1 - tx) * ty * flow.vy[k01] + tx * ty * flow.vy[k11];
-      return [u, v];
-    }
-
-    function inPoly(poly, x, y) {
-      let n = false;
-      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
-        const hit = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
-        if (hit) n = !n;
-      }
-      return n;
-    }
-
-    function seedOne(flow, meta, body) {
-      const x0 = (meta && meta.x0 != null) ? meta.x0 : -1.80;
-      let x = x0 + 0.04 + Math.random() * 0.08;
-      let y = 0.06 + Math.random() * 1.7;
-      let tries = 0;
-      while (body && inPoly(body, x, y) && tries++ < 6) y = 0.06 + Math.random() * 1.7;
-      return { x, y, trail: [] };
-    }
-
     function pathPoly(poly, toS, close) {
       ctx.beginPath();
       poly.forEach(([x, y], n) => {
@@ -234,139 +216,136 @@
       });
       if (close !== false) ctx.closePath();
     }
+    function offsetRibbon(poly, dist) {
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[Math.max(0, i - 1)], b = poly[Math.min(poly.length - 1, i + 1)];
+        let tx = b[0] - a[0], ty = b[1] - a[1];
+        const L = Math.hypot(tx, ty) || 1;
+        const nx = -ty / L, ny = tx / L;
+        out.push([poly[i][0] + nx * dist, poly[i][1] + ny * dist]);
+      }
+      return out;
+    }
+    function extend(poly, xIn, xOut) {
+      const a = poly[0], b = poly[poly.length - 1];
+      return [[xIn, a[1]], ...poly, [xOut, b[1] + (b[1] - poly[poly.length - 2][1]) * 0.4],
+              [xOut + 0.35, b[1] + 0.08]];
+    }
+    function strokeRibbon(poly, toS, phase, width, alpha) {
+      ctx.beginPath();
+      poly.forEach(([x, y], n) => {
+        const p = toS(x, y);
+        n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+      });
+      ctx.strokeStyle = `rgba(62, 199, 255, ${alpha})`;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([18 * devicePixelRatio, 22 * devicePixelRatio]);
+      ctx.lineDashOffset = -phase;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
-    function wheelCenter(toS, ax) {
-      const c = toS(ax, WHEEL_R);
-      const r = Math.abs(toS(ax + WHEEL_R, WHEEL_R)[0] - c[0]);
-      const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
-      return { c, r, rWell };
+    function drawTunnel(toS, s, dpr, now) {
+      const w = canvas.width, h = canvas.height;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, "#05080d");
+      g.addColorStop(0.7, "#070b12");
+      g.addColorStop(1, "#0a1018");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      const floor = toS(-1, 0), floor2 = toS(6, 0);
+      ctx.fillStyle = "#0b1118";
+      ctx.fillRect(0, floor[1], w, h);
+      ctx.strokeStyle = "rgba(40, 70, 90, 0.35)";
+      ctx.lineWidth = 1;
+      for (let x = -0.8; x < 5.8; x += 0.4) {
+        const a = toS(x, 0), b = toS(x, -0.04);
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1] + 18); ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(floor[0], floor[1]); ctx.lineTo(floor2[0], floor2[1]);
+      ctx.strokeStyle = "rgba(80, 140, 170, 0.45)";
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.stroke();
+    }
+
+    function drawSmoke(toS, s, dpr, now) {
+      const upper = upperBody(s.hf, s.hr);
+      const phase = (now / 18) * (s.V / 30);
+      const offsets = [0.05, 0.11, 0.19, 0.30, 0.46, 0.68, 0.95, 1.28];
+      offsets.forEach((d, i) => {
+        const rib = extend(offsetRibbon(upper, d), -0.85, 5.15);
+        strokeRibbon(rib, toS, phase + i * 9, (1.4 + i * 0.08) * dpr, 0.22 + 0.07 * (1 - i / offsets.length));
+      });
+      const hAvg = 0.5 * (s.hf + s.hr);
+      const nUnder = hAvg < 0.11 ? 4 : hAvg < 0.14 ? 3 : 2;
+      for (let i = 0; i < nUnder; i++) {
+        const y = 0.018 + (hAvg - 0.02) * (i + 0.5) / nUnder;
+        const under = [[-0.85, y], [0.2, y], [1.2, y * 0.95], [2.4, y], [3.6, y], [4.8, y + 0.04], [5.3, y + 0.1]];
+        strokeRibbon(under, toS, phase * 1.15 + i * 11, 1.3 * dpr, 0.28);
+      }
     }
 
     function drawCar(toS, s, dpr) {
-      const upper = upperBody(s.h);
-      const body = closedBody(s.h, s.splitterM, s.wingM, s.diffuserM);
-      const glass = glassPoly(s.h);
-
+      const upper = upperBody(s.hf, s.hr);
+      const body = closedBody(s);
       pathPoly(body, toS);
-      ctx.fillStyle = "#38414c";
+      ctx.fillStyle = "#8b949e";
       ctx.fill();
 
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       AXLES.forEach((ax) => {
-        const { c, rWell } = wheelCenter(toS, ax);
-        ctx.beginPath();
-        ctx.arc(c[0], c[1], rWell, 0, Math.PI * 2);
-        ctx.fill();
+        const c = toS(ax, WHEEL_R);
+        const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
+        ctx.beginPath(); ctx.arc(c[0], c[1], rWell, 0, Math.PI * 2); ctx.fill();
       });
       ctx.restore();
 
-      ctx.beginPath();
-      const g0 = toS(-0.6, 0), g1 = toS(5.2, 0);
-      ctx.moveTo(g0[0], g0[1]); ctx.lineTo(g1[0], g1[1]);
-      ctx.strokeStyle = "#2a3340";
-      ctx.lineWidth = 1.2 * dpr;
-      ctx.stroke();
-
       pathPoly(upper, toS, false);
-      ctx.strokeStyle = "#e31937";
-      ctx.lineWidth = 2.4 * dpr;
+      ctx.strokeStyle = "rgba(227, 25, 55, 0.85)";
+      ctx.lineWidth = 1.6 * dpr;
       ctx.lineJoin = "round";
-      ctx.lineCap = "round";
       ctx.stroke();
 
       AXLES.forEach((ax) => {
-        const { c, r, rWell } = wheelCenter(toS, ax);
+        const c = toS(ax, WHEEL_R);
+        const r = Math.abs(toS(ax + WHEEL_R, WHEEL_R)[0] - c[0]);
+        const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
         ctx.beginPath();
         ctx.arc(c[0], c[1], rWell, Math.PI * 1.08, Math.PI * 1.92, true);
-        ctx.strokeStyle = "#e31937";
-        ctx.lineWidth = 2.4 * dpr;
+        ctx.strokeStyle = "rgba(227, 25, 55, 0.85)";
+        ctx.lineWidth = 1.6 * dpr;
         ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
-        ctx.fillStyle = "#0d1014";
-        ctx.fill();
-        ctx.strokeStyle = "#8a93a2";
-        ctx.lineWidth = 2 * dpr;
-        ctx.stroke();
-
-        ctx.save();
-        ctx.translate(c[0], c[1]);
-        ctx.fillStyle = "#2e3540";
+        ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
+        ctx.fillStyle = "#12151a"; ctx.fill();
+        ctx.strokeStyle = "#9aa3b0"; ctx.lineWidth = 1.8 * dpr; ctx.stroke();
+        ctx.save(); ctx.translate(c[0], c[1]); ctx.fillStyle = "#2a313c";
         for (let k = 0; k < 5; k++) {
-          ctx.rotate((Math.PI * 2) / 5);
-          ctx.beginPath();
-          ctx.ellipse(0, -r * 0.36, r * 0.08, r * 0.30, 0, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.rotate(Math.PI * 2 / 5);
+          ctx.beginPath(); ctx.ellipse(0, -r * 0.36, r * 0.08, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
-        ctx.beginPath();
-        ctx.arc(c[0], c[1], r * 0.2, 0, Math.PI * 2);
-        ctx.fillStyle = "#4a5360";
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = "#4a5360"; ctx.fill();
       });
 
-      pathPoly(glass, toS);
-      ctx.fillStyle = "rgba(120, 148, 170, 0.42)";
+      pathPoly(glassPoly(s.hf, s.hr), toS);
+      ctx.fillStyle = "rgba(30, 50, 70, 0.55)";
       ctx.fill();
-
-      const dy = s.h - STOCK_H;
-      pathPoly([[1.50, 0.92 + dy], [1.62, 0.97 + dy], [1.64, 0.90 + dy], [1.52, 0.86 + dy]], toS);
-      ctx.fillStyle = "#1c222a";
-      ctx.fill();
-      ctx.strokeStyle = "#e31937";
-      ctx.lineWidth = 1.2 * dpr;
-      ctx.stroke();
     }
 
-    function frame() {
+    function frame(now) {
       const dpr = devicePixelRatio || 1;
+      const s = setup();
+      const toS = worldToScreen(s);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const s = currentSetup();
-      const body = closedBody(s.h, s.splitterM, s.wingM, s.diffuserM);
-      const toS = worldToScreen();
-
-      if (last && last.flow) {
-        const { flow, meta } = last;
-        const x0 = (meta && meta.x0 != null) ? meta.x0 : -1.80;
-        const x1 = x0 + (flow.nx - 1) * flow.dx;
-        const V = Math.max(1, Number($("airspeedMps").value) || 30);
-        while (particles.length < N_PARTICLES) particles.push(seedOne(flow, meta, body));
-        if (particles.length > N_PARTICLES) particles.length = N_PARTICLES;
-        const dt = 0.022 * (V / 30);
-        for (const p of particles) {
-          const [u, v] = sampleVel(flow, meta, p.x, p.y);
-          const spd = Math.hypot(u, v);
-          p.trail.push([p.x, p.y]);
-          if (p.trail.length > TRAIL) p.trail.shift();
-          const inWheel = AXLES.some((ax) => Math.hypot(p.x - ax, p.y - WHEEL_R) < WELL_R);
-          if (spd < 0.2 || inPoly(body, p.x, p.y) || inWheel || p.x > x1 - 0.08 || p.y < 0.015 || p.y > 2.0) {
-            Object.assign(p, seedOne(flow, meta, body));
-            p.trail = [];
-            continue;
-          }
-          p.x += u * dt;
-          p.y += v * dt;
-        }
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        for (const p of particles) {
-          if (p.trail.length < 3) continue;
-          const [u, v] = sampleVel(flow, meta, p.x, p.y);
-          const spd = Math.hypot(u, v);
-          const t = Math.max(0, Math.min(1, spd / (V * 1.4)));
-          ctx.strokeStyle = `hsla(${200 - 70 * t}, 80%, ${58 + 8 * t}%, 0.42)`;
-          ctx.lineWidth = (1.15 + 0.6 * t) * dpr;
-          ctx.beginPath();
-          p.trail.forEach(([x, y], i) => {
-            const q = toS(x, y);
-            i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]);
-          });
-          ctx.stroke();
-        }
-      }
-
+      drawTunnel(toS, s, dpr, now);
+      drawSmoke(toS, s, dpr, now);
       drawCar(toS, s, dpr);
       requestAnimationFrame(frame);
     }
@@ -378,21 +357,25 @@
       const d = a >= 100 ? 0 : a >= 10 ? 1 : 2;
       return n.toFixed(d) + (u || "");
     }
-    function scheduleSim() {
-      clearTimeout(simTimer);
-      simTimer = setTimeout(simulate, 140);
+    function fillForces(f, map) {
+      if (!f) return;
+      Object.entries(map).forEach(([k, id]) => { $(id).textContent = fmt(f[k], k.includes("N") || k === "dragN" ? " N" : k === "balancePct" ? " %" : ""); });
     }
+    function scheduleSim() { clearTimeout(simTimer); simTimer = setTimeout(simulate, 120); }
     async function simulate() {
       $("err").textContent = "";
-      $("go").disabled = true;
+      const hf = Number($("rideHeightFrontMm").value);
+      const hr = Number($("rideHeightRearMm").value);
       const body = {
         airspeedMps: Number($("airspeedMps").value),
-        rideHeightMm: Number($("rideHeightMm").value),
+        rideHeightFrontMm: hf,
+        rideHeightRearMm: hr,
+        rideHeightMm: Math.round(0.5 * (hf + hr)),
         splitter: Number($("splitter").value),
         rearWing: Number($("rearWing").value),
         diffuser: Number($("diffuser").value),
       };
-      const t0 = performance.now();
+      const t = performance.now();
       try {
         const res = await fetch("/simulate", {
           method: "POST",
@@ -400,10 +383,8 @@
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        last = data;
-        particles = [];
-        const f = data.forces;
+        last = await res.json();
+        const f = last.forces || {};
         $("cd").textContent = fmt(f.cd);
         $("cl").textContent = fmt(f.cl);
         $("dragN").textContent = fmt(f.dragN, " N");
@@ -411,14 +392,20 @@
         $("frontN").textContent = fmt(f.frontN, " N");
         $("rearN").textContent = fmt(f.rearN, " N");
         $("balancePct").textContent = fmt(f.balancePct, " %");
-        $("ms").textContent = Math.round(performance.now() - t0) + " ms";
+        $("ms").textContent = Math.round(performance.now() - t) + " ms";
+        const mph = last.forcesAtMph || {};
+        const a = mph["60"] || mph[60];
+        const b = mph["130"] || mph[130];
+        $("d60").textContent = a ? fmt(a.dragN, " N") : "—";
+        $("l60").textContent = a ? fmt(a.downforceN, " N") : "—";
+        $("b60").textContent = a ? fmt(a.balancePct, " %") : "—";
+        $("d130").textContent = b ? fmt(b.dragN, " N") : "—";
+        $("l130").textContent = b ? fmt(b.downforceN, " N") : "—";
+        $("b130").textContent = b ? fmt(b.balancePct, " %") : "—";
       } catch (e) {
         $("err").textContent = String(e);
-      } finally {
-        $("go").disabled = false;
       }
     }
-    $("go").addEventListener("click", simulate);
     simulate();
   </script>
 </body>
