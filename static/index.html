@@ -117,16 +117,16 @@
     const $ = (id) => document.getElementById(id);
     const canvas = $("c");
     const ctx = canvas.getContext("2d");
-    const STOCK = 0.128, LEN = 4.724, WHEEL_R = 0.325, WELL_R = 0.368;
+    const STOCK = 0.128, LEN = 4.724, WHEEL_R = 0.325, WELL_R = 0.372;
     const AXLES = [0.85, 3.72];
     const UPPER0 = [
-      [0.00, 0.16], [0.00, 0.58], [0.06, 0.64], [0.16, 0.66],
-      [0.40, 0.66], [0.70, 0.67], [1.00, 0.70],
-      [1.16, 0.88], [1.32, 1.12], [1.52, 1.30], [1.75, 1.40],
-      [2.05, 1.428], [2.45, 1.431], [2.85, 1.425], [3.15, 1.395],
-      [3.42, 1.28], [3.68, 1.12], [3.95, 1.00], [4.20, 0.95],
-      [4.38, 0.93], [4.50, 0.96], [4.56, 1.05], [4.64, 0.98],
-      [4.70, 0.76], [4.724, 0.40], [4.68, 0.22], [4.48, 0.16],
+      [0.00, 0.17], [0.00, 0.40], [0.015, 0.54], [0.07, 0.62], [0.16, 0.645],
+      [0.38, 0.655], [0.62, 0.662], [0.88, 0.675], [1.10, 0.705],
+      [1.26, 0.86], [1.40, 1.05], [1.55, 1.22], [1.72, 1.34], [1.92, 1.405],
+      [2.15, 1.426], [2.45, 1.432], [2.78, 1.428], [3.08, 1.408],
+      [3.32, 1.34], [3.55, 1.20], [3.78, 1.06], [4.00, 0.98], [4.20, 0.942],
+      [4.38, 0.935], [4.48, 0.955], [4.54, 1.015], [4.62, 0.965],
+      [4.69, 0.78], [4.72, 0.50], [4.724, 0.34], [4.70, 0.21], [4.50, 0.16],
     ];
 
     function resize() {
@@ -138,12 +138,8 @@
     resize();
 
     const bind = [
-      ["airspeedMps", " m/s"],
-      ["rideHeightFrontMm", " mm"],
-      ["rideHeightRearMm", " mm"],
-      ["splitter", " mm"],
-      ["rearWing", " mm"],
-      ["diffuser", " mm"],
+      ["airspeedMps", " m/s"], ["rideHeightFrontMm", " mm"], ["rideHeightRearMm", " mm"],
+      ["splitter", " mm"], ["rearWing", " mm"], ["diffuser", " mm"],
     ];
     bind.forEach(([id, u]) => {
       $(id).addEventListener("input", () => {
@@ -154,7 +150,7 @@
       });
     });
 
-    let last = null, t0 = performance.now(), simTimer = null;
+    let last = null, simTimer = null;
 
     function setup() {
       return {
@@ -170,173 +166,270 @@
       const t = Math.max(0, Math.min(1, x / LEN));
       return hf + (hr - hf) * t;
     }
-    function upperBody(hf, hr) {
-      return UPPER0.map(([x, y]) => [x, y - STOCK + pitchY(x, hf, hr)]);
-    }
+    function py(x, y, hf, hr) { return [x, y - STOCK + pitchY(x, hf, hr)]; }
+    function upperBody(hf, hr) { return UPPER0.map(([x, y]) => py(x, y, hf, hr)); }
     function closedBody(s) {
       const upper = upperBody(s.hf, s.hr);
       const pts = upper.slice();
       if (s.wingM > 0.004) {
-        const duck = upper[21];
-        const xLe = duck[0] - 0.05, y0 = duck[1] + 0.04;
-        pts.push([xLe, y0], [xLe + 0.05, y0 + 0.028], [xLe + s.wingM, y0 + 0.04],
-                 [xLe + s.wingM, y0 + 0.01], [xLe, y0]);
+        const duck = upper[25];
+        const xLe = duck[0] - 0.04, y0 = duck[1] + 0.035;
+        pts.push([xLe, y0], [xLe + 0.04, y0 + 0.022], [xLe + s.wingM, y0 + 0.03],
+                 [xLe + s.wingM, y0 + 0.008], [xLe, y0]);
       }
-      const rise = Math.min(s.diffuserM * 0.9, 0.22);
-      pts.push([LEN, s.hr + rise], [0.12, s.hf]);
+      const rise = Math.min(s.diffuserM * 0.85, 0.2);
+      pts.push([LEN, s.hr + rise]);
+      for (let x = 4.3; x >= 0.15; x -= 0.35) pts.push([x, pitchY(x, s.hf, s.hr)]);
       if (s.splitterM > 0.001) {
-        pts.push([-s.splitterM, s.hf - 0.01], [-s.splitterM, s.hf - 0.022]);
+        pts.push([-s.splitterM, s.hf - 0.008], [-s.splitterM, s.hf - 0.02]);
       }
       pts.push([0, s.hf], [0, upper[0][1]]);
       return pts;
     }
-    function glassPoly(hf, hr) {
-      const p = [
-        [1.20, 0.86], [1.36, 1.10], [1.55, 1.28], [1.78, 1.385],
-        [2.10, 1.412], [2.50, 1.412], [2.90, 1.405], [3.18, 1.37],
-        [3.45, 1.24], [3.62, 1.12], [3.48, 1.04], [2.60, 1.16],
-        [1.90, 1.16], [1.32, 0.82],
-      ];
-      return p.map(([x, y]) => [x, y - STOCK + pitchY(x, hf, hr)]);
-    }
+
     function worldToScreen(s) {
-      const x0 = -0.9 - s.splitterM, x1 = 5.6, y0 = -0.08, y1 = 1.85;
-      const pad = 36 * devicePixelRatio;
+      const x0 = -0.85 - s.splitterM, x1 = 5.55, y0 = -0.12, y1 = 1.82;
+      const pad = 40 * devicePixelRatio;
       const w = canvas.width - 2 * pad, h = canvas.height - 2 * pad;
       const sc = Math.min(w / (x1 - x0), h / (y1 - y0));
       const ox = pad + (w - sc * (x1 - x0)) / 2;
       const oy = pad + (h - sc * (y1 - y0)) / 2;
       return (x, y) => [ox + (x - x0) * sc, canvas.height - (oy + (y - y0) * sc)];
     }
-    function pathPoly(poly, toS, close) {
+
+    function curve(pts, toS, close) {
+      const p = pts.map(([x, y]) => toS(x, y));
+      if (p.length < 2) return;
       ctx.beginPath();
-      poly.forEach(([x, y], n) => {
-        const p = toS(x, y);
-        n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-      });
-      if (close !== false) ctx.closePath();
+      ctx.moveTo(p[0][0], p[0][1]);
+      if (p.length === 2) { ctx.lineTo(p[1][0], p[1][1]); }
+      else {
+        for (let i = 0; i < p.length - 1; i++) {
+          const p0 = p[Math.max(0, i - 1)], p1 = p[i], p2 = p[i + 1], p3 = p[Math.min(p.length - 1, i + 2)];
+          ctx.bezierCurveTo(
+            p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+            p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6,
+            p2[0], p2[1]
+          );
+        }
+      }
+      if (close) ctx.closePath();
     }
+
     function offsetRibbon(poly, dist) {
       const out = [];
       for (let i = 0; i < poly.length; i++) {
         const a = poly[Math.max(0, i - 1)], b = poly[Math.min(poly.length - 1, i + 1)];
-        let tx = b[0] - a[0], ty = b[1] - a[1];
-        const L = Math.hypot(tx, ty) || 1;
-        const nx = -ty / L, ny = tx / L;
-        out.push([poly[i][0] + nx * dist, poly[i][1] + ny * dist]);
+        const tx = b[0] - a[0], ty = b[1] - a[1], L = Math.hypot(tx, ty) || 1;
+        out.push([poly[i][0] - ty / L * dist, poly[i][1] + tx / L * dist]);
       }
       return out;
     }
-    function extend(poly, xIn, xOut) {
-      const a = poly[0], b = poly[poly.length - 1];
-      return [[xIn, a[1]], ...poly, [xOut, b[1] + (b[1] - poly[poly.length - 2][1]) * 0.4],
-              [xOut + 0.35, b[1] + 0.08]];
-    }
-    function strokeRibbon(poly, toS, phase, width, alpha) {
-      ctx.beginPath();
-      poly.forEach(([x, y], n) => {
-        const p = toS(x, y);
-        n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-      });
-      ctx.strokeStyle = `rgba(62, 199, 255, ${alpha})`;
-      ctx.lineWidth = width;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.setLineDash([18 * devicePixelRatio, 22 * devicePixelRatio]);
-      ctx.lineDashOffset = -phase;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
 
-    function drawTunnel(toS, s, dpr, now) {
+    function screenPoly(poly, toS) { return poly.map(([x, y]) => toS(x, y)); }
+
+    function drawTunnel(toS, dpr) {
       const w = canvas.width, h = canvas.height;
-      const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, "#05080d");
-      g.addColorStop(0.7, "#070b12");
-      g.addColorStop(1, "#0a1018");
+      const g = ctx.createRadialGradient(w * 0.55, h * 0.42, 40, w * 0.5, h * 0.45, w * 0.75);
+      g.addColorStop(0, "#141a24");
+      g.addColorStop(0.45, "#080c12");
+      g.addColorStop(1, "#020305");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
-
-      const floor = toS(-1, 0), floor2 = toS(6, 0);
-      ctx.fillStyle = "#0b1118";
-      ctx.fillRect(0, floor[1], w, h);
-      ctx.strokeStyle = "rgba(40, 70, 90, 0.35)";
-      ctx.lineWidth = 1;
-      for (let x = -0.8; x < 5.8; x += 0.4) {
-        const a = toS(x, 0), b = toS(x, -0.04);
-        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1] + 18); ctx.stroke();
-      }
+      const f0 = toS(-1.2, 0), f1 = toS(6.2, 0);
+      const fg = ctx.createLinearGradient(0, f0[1] - 8, 0, h);
+      fg.addColorStop(0, "rgba(70, 120, 150, 0.18)");
+      fg.addColorStop(0.08, "rgba(12, 18, 26, 0.95)");
+      fg.addColorStop(1, "#05080c");
+      ctx.fillStyle = fg;
+      ctx.fillRect(0, f0[1], w, h);
       ctx.beginPath();
-      ctx.moveTo(floor[0], floor[1]); ctx.lineTo(floor2[0], floor2[1]);
-      ctx.strokeStyle = "rgba(80, 140, 170, 0.45)";
-      ctx.lineWidth = 1.2 * dpr;
+      ctx.moveTo(f0[0], f0[1]); ctx.lineTo(f1[0], f1[1]);
+      ctx.strokeStyle = "rgba(110, 170, 200, 0.22)";
+      ctx.lineWidth = 1 * dpr;
       ctx.stroke();
+    }
+
+    function glowRibbon(pts, toS, dpr, width, alpha) {
+      curve(pts, toS, false);
+      ctx.save();
+      ctx.strokeStyle = `rgba(70, 190, 255, ${alpha * 0.35})`;
+      ctx.shadowColor = "rgba(80, 210, 255, 0.9)";
+      ctx.shadowBlur = 16 * dpr;
+      ctx.lineWidth = width * 2.2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `rgba(190, 235, 255, ${alpha})`;
+      ctx.lineWidth = width * 0.55;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function along(pts, t) {
+      let tot = 0;
+      const seg = [];
+      for (let i = 1; i < pts.length; i++) {
+        const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        seg.push(d); tot += d;
+      }
+      let s = ((t % 1) + 1) % 1 * tot;
+      for (let i = 1; i < pts.length; i++) {
+        if (s <= seg[i - 1]) {
+          const u = s / (seg[i - 1] || 1);
+          return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u,
+                  pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u];
+        }
+        s -= seg[i - 1];
+      }
+      return pts[pts.length - 1];
     }
 
     function drawSmoke(toS, s, dpr, now) {
       const upper = upperBody(s.hf, s.hr);
-      const phase = (now / 18) * (s.V / 30);
-      const offsets = [0.05, 0.11, 0.19, 0.30, 0.46, 0.68, 0.95, 1.28];
+      const phase = (now / 2400) * (s.V / 30);
+      const offsets = [0.045, 0.09, 0.15, 0.23, 0.34, 0.50, 0.72, 1.02, 1.38];
       offsets.forEach((d, i) => {
-        const rib = extend(offsetRibbon(upper, d), -0.85, 5.15);
-        strokeRibbon(rib, toS, phase + i * 9, (1.4 + i * 0.08) * dpr, 0.22 + 0.07 * (1 - i / offsets.length));
+        const rib = [[-0.9, upper[0][1] + d], ...offsetRibbon(upper, d)];
+        const tail = rib[rib.length - 1];
+        const open = 0.04 + i * 0.025;
+        rib.push([tail[0] + 0.35, tail[1] + open * 0.3], [5.25, tail[1] + open]);
+        glowRibbon(rib, toS, dpr, (1.15 + i * 0.04) * dpr, 0.55 - i * 0.035);
+        const p = along(rib, phase + i * 0.11);
+        const q = toS(p[0], p[1]);
+        ctx.beginPath();
+        ctx.arc(q[0], q[1], 1.6 * dpr, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(220, 245, 255, 0.9)";
+        ctx.fill();
       });
       const hAvg = 0.5 * (s.hf + s.hr);
-      const nUnder = hAvg < 0.11 ? 4 : hAvg < 0.14 ? 3 : 2;
+      const nUnder = hAvg < 0.105 ? 4 : hAvg < 0.135 ? 3 : 2;
       for (let i = 0; i < nUnder; i++) {
-        const y = 0.018 + (hAvg - 0.02) * (i + 0.5) / nUnder;
-        const under = [[-0.85, y], [0.2, y], [1.2, y * 0.95], [2.4, y], [3.6, y], [4.8, y + 0.04], [5.3, y + 0.1]];
-        strokeRibbon(under, toS, phase * 1.15 + i * 11, 1.3 * dpr, 0.28);
+        const y = 0.016 + (Math.max(hAvg - 0.025, 0.03)) * (i + 0.4) / nUnder;
+        const under = [[-0.9, y], [0.3, y], [1.4, y * 0.92], [2.5, y], [3.7, y], [4.9, y + 0.03], [5.3, y + 0.08]];
+        glowRibbon(under, toS, dpr, 1.15 * dpr, 0.5);
       }
+    }
+
+    function wheelGeom(toS, ax) {
+      const c = toS(ax, WHEEL_R);
+      const r = Math.abs(toS(ax + WHEEL_R, WHEEL_R)[0] - c[0]);
+      const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
+      return { c, r, rWell };
     }
 
     function drawCar(toS, s, dpr) {
       const upper = upperBody(s.hf, s.hr);
       const body = closedBody(s);
-      pathPoly(body, toS);
-      ctx.fillStyle = "#8b949e";
+      const yf = (x, y) => py(x, y, s.hf, s.hr);
+
+      curve(body, toS, true);
+      const g0 = toS(2.4, 1.43), g1 = toS(2.4, 0.16);
+      const paint = ctx.createLinearGradient(0, g0[1], 0, g1[1]);
+      paint.addColorStop(0, "#d8dee6");
+      paint.addColorStop(0.35, "#9aa7b4");
+      paint.addColorStop(0.7, "#6d7884");
+      paint.addColorStop(1, "#3e4650");
+      ctx.fillStyle = paint;
       ctx.fill();
+
+      ctx.save();
+      ctx.clip();
+      const spec = ctx.createLinearGradient(0, g0[1], 0, g1[1]);
+      spec.addColorStop(0, "rgba(255,255,255,0.28)");
+      spec.addColorStop(0.22, "rgba(255,255,255,0)");
+      ctx.fillStyle = spec;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
 
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       AXLES.forEach((ax) => {
-        const c = toS(ax, WHEEL_R);
-        const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
+        const { c, rWell } = wheelGeom(toS, ax);
         ctx.beginPath(); ctx.arc(c[0], c[1], rWell, 0, Math.PI * 2); ctx.fill();
       });
       ctx.restore();
 
-      pathPoly(upper, toS, false);
-      ctx.strokeStyle = "rgba(227, 25, 55, 0.85)";
-      ctx.lineWidth = 1.6 * dpr;
+      curve(upper, toS, false);
+      ctx.strokeStyle = "rgba(20, 24, 30, 0.55)";
+      ctx.lineWidth = 1.1 * dpr;
       ctx.lineJoin = "round";
       ctx.stroke();
 
+      const glass = [
+        yf(1.30, 0.86), yf(1.44, 1.06), yf(1.60, 1.24), yf(1.80, 1.36),
+        yf(2.05, 1.405), yf(2.40, 1.412), yf(2.78, 1.405), yf(3.08, 1.385),
+        yf(3.32, 1.30), yf(3.55, 1.16), yf(3.42, 1.05), yf(2.55, 1.175),
+        yf(1.95, 1.175), yf(1.42, 0.84),
+      ];
+      curve(glass, toS, true);
+      const gg = ctx.createLinearGradient(0, toS(2.4, 1.41)[1], 0, toS(2.4, 0.86)[1]);
+      gg.addColorStop(0, "rgba(55, 85, 110, 0.72)");
+      gg.addColorStop(1, "rgba(18, 28, 40, 0.82)");
+      ctx.fillStyle = gg;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(200, 220, 235, 0.18)";
+      ctx.lineWidth = 0.8 * dpr;
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(12, 14, 18, 0.45)";
+      ctx.lineWidth = 2.2 * dpr;
+      curve([yf(1.95, 1.40), yf(1.98, 0.92)], toS, false); ctx.stroke();
+      curve([yf(2.72, 1.40), yf(2.78, 0.93)], toS, false); ctx.stroke();
+
+      ctx.strokeStyle = "rgba(30, 34, 40, 0.28)";
+      ctx.lineWidth = 1 * dpr;
+      curve([yf(1.55, 0.90), yf(1.72, 0.72), yf(2.55, 0.73), yf(3.55, 0.92)], toS, false); ctx.stroke();
+      curve([yf(2.15, 0.73), yf(2.18, 0.22)], toS, false); ctx.stroke();
+      curve([yf(3.15, 0.78), yf(3.22, 0.22)], toS, false); ctx.stroke();
+
+      const hl = [yf(0.02, 0.54), yf(0.10, 0.57), yf(0.28, 0.575), yf(0.32, 0.55), yf(0.12, 0.52), yf(0.02, 0.50)];
+      curve(hl, toS, true);
+      ctx.fillStyle = "rgba(230, 240, 255, 0.55)";
+      ctx.fill();
+
+      const tl = [yf(4.58, 0.92), yf(4.68, 0.88), yf(4.70, 0.78), yf(4.60, 0.80), yf(4.52, 0.88)];
+      curve(tl, toS, true);
+      ctx.fillStyle = "rgba(180, 30, 40, 0.75)";
+      ctx.fill();
+
+      const mir = [yf(1.48, 0.92), yf(1.62, 0.96), yf(1.64, 0.90), yf(1.52, 0.86)];
+      curve(mir, toS, true);
+      ctx.fillStyle = "#2a3138";
+      ctx.fill();
+
       AXLES.forEach((ax) => {
-        const c = toS(ax, WHEEL_R);
-        const r = Math.abs(toS(ax + WHEEL_R, WHEEL_R)[0] - c[0]);
-        const rWell = Math.abs(toS(ax + WELL_R, WHEEL_R)[0] - c[0]);
+        const { c, r, rWell } = wheelGeom(toS, ax);
         ctx.beginPath();
-        ctx.arc(c[0], c[1], rWell, Math.PI * 1.08, Math.PI * 1.92, true);
-        ctx.strokeStyle = "rgba(227, 25, 55, 0.85)";
-        ctx.lineWidth = 1.6 * dpr;
+        ctx.arc(c[0], c[1], rWell, Math.PI * 1.06, Math.PI * 1.94, true);
+        ctx.strokeStyle = "rgba(30, 34, 40, 0.7)";
+        ctx.lineWidth = 1.4 * dpr;
         ctx.stroke();
+
         ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
-        ctx.fillStyle = "#12151a"; ctx.fill();
-        ctx.strokeStyle = "#9aa3b0"; ctx.lineWidth = 1.8 * dpr; ctx.stroke();
-        ctx.save(); ctx.translate(c[0], c[1]); ctx.fillStyle = "#2a313c";
-        for (let k = 0; k < 5; k++) {
-          ctx.rotate(Math.PI * 2 / 5);
-          ctx.beginPath(); ctx.ellipse(0, -r * 0.36, r * 0.08, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#121417"; ctx.fill();
+        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.78, 0, Math.PI * 2);
+        ctx.fillStyle = "#1c2026"; ctx.fill();
+        ctx.strokeStyle = "#8b93a0"; ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+
+        ctx.save();
+        ctx.translate(c[0], c[1]);
+        ctx.strokeStyle = "#4a5360";
+        ctx.lineWidth = 1.15 * dpr;
+        for (let k = 0; k < 14; k++) {
+          ctx.rotate(Math.PI / 7);
+          ctx.beginPath();
+          ctx.moveTo(r * 0.12, 0);
+          ctx.lineTo(r * 0.70, r * 0.08);
+          ctx.stroke();
         }
         ctx.restore();
-        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.2, 0, Math.PI * 2);
-        ctx.fillStyle = "#4a5360"; ctx.fill();
+        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.18, 0, Math.PI * 2);
+        ctx.fillStyle = "#5a6370"; ctx.fill();
+        ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.07, 0, Math.PI * 2);
+        ctx.fillStyle = "#2a3038"; ctx.fill();
       });
-
-      pathPoly(glassPoly(s.hf, s.hr), toS);
-      ctx.fillStyle = "rgba(30, 50, 70, 0.55)";
-      ctx.fill();
     }
 
     function frame(now) {
@@ -344,7 +437,7 @@
       const s = setup();
       const toS = worldToScreen(s);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawTunnel(toS, s, dpr, now);
+      drawTunnel(toS, dpr);
       drawSmoke(toS, s, dpr, now);
       drawCar(toS, s, dpr);
       requestAnimationFrame(frame);
@@ -357,10 +450,6 @@
       const d = a >= 100 ? 0 : a >= 10 ? 1 : 2;
       return n.toFixed(d) + (u || "");
     }
-    function fillForces(f, map) {
-      if (!f) return;
-      Object.entries(map).forEach(([k, id]) => { $(id).textContent = fmt(f[k], k.includes("N") || k === "dragN" ? " N" : k === "balancePct" ? " %" : ""); });
-    }
     function scheduleSim() { clearTimeout(simTimer); simTimer = setTimeout(simulate, 120); }
     async function simulate() {
       $("err").textContent = "";
@@ -368,8 +457,7 @@
       const hr = Number($("rideHeightRearMm").value);
       const body = {
         airspeedMps: Number($("airspeedMps").value),
-        rideHeightFrontMm: hf,
-        rideHeightRearMm: hr,
+        rideHeightFrontMm: hf, rideHeightRearMm: hr,
         rideHeightMm: Math.round(0.5 * (hf + hr)),
         splitter: Number($("splitter").value),
         rearWing: Number($("rearWing").value),
@@ -378,8 +466,7 @@
       const t = performance.now();
       try {
         const res = await fetch("/simulate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(await res.text());
@@ -394,17 +481,14 @@
         $("balancePct").textContent = fmt(f.balancePct, " %");
         $("ms").textContent = Math.round(performance.now() - t) + " ms";
         const mph = last.forcesAtMph || {};
-        const a = mph["60"] || mph[60];
-        const b = mph["130"] || mph[130];
+        const a = mph["60"] || mph[60], b = mph["130"] || mph[130];
         $("d60").textContent = a ? fmt(a.dragN, " N") : "—";
         $("l60").textContent = a ? fmt(a.downforceN, " N") : "—";
         $("b60").textContent = a ? fmt(a.balancePct, " %") : "—";
         $("d130").textContent = b ? fmt(b.dragN, " N") : "—";
         $("l130").textContent = b ? fmt(b.downforceN, " N") : "—";
         $("b130").textContent = b ? fmt(b.balancePct, " %") : "—";
-      } catch (e) {
-        $("err").textContent = String(e);
-      }
+      } catch (e) { $("err").textContent = String(e); }
     }
     simulate();
   </script>
